@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TableTap - Kitchen & Cashier Live Orders</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body class="bg-slate-900 text-gray-100 min-h-screen p-4 select-none">
+
+  <!-- Header -->
+  <header class="max-w-4xl mx-auto flex justify-between items-center pb-4 border-b border-slate-700">
+    <div>
+      <h1 class="text-xl font-black tracking-wide text-orange-500 flex items-center gap-2">
+        <i class="fa-solid fa-bell-concierge"></i> TableTap Kitchen Live
+      </h1>
+      <p class="text-xs text-slate-400">Bawarchi Restaurant • లైవ్ ఆర్డర్ల స్క్రీన్</p>
+    </div>
+    <div class="flex items-center gap-3">
+      <!-- Sound Enable Button -->
+      <button id="soundToggleBtn" onclick="toggleSound()" class="bg-slate-800 border border-slate-700 hover:border-orange-500 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300 transition">
+        <i id="soundIcon" class="fa-solid fa-volume-xmark text-red-400"></i>
+        <span id="soundText">Sound Off</span>
+      </button>
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
+        <span class="text-xs font-semibold text-emerald-400">Live</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Live Orders Grid -->
+  <main class="max-w-4xl mx-auto mt-5">
+    <div id="ordersContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <p class="text-slate-500 text-sm text-center col-span-full py-10">ఆర్డర్ల కోసం వేచి చూస్తున్నాం...</p>
+    </div>
+  </main>
+
+  <!-- Firebase Modular Scripts -->
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+    import { getFirestore, collection, onSnapshot, query, orderBy, doc, updateDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyAjHoFCzSmENKmG00FGPMQzXzE",
+      authDomain: "table-tap-1d104.firebaseapp.com",
+      projectId: "table-tap-1d104",
+      storageBucket: "table-tap-1d104.firebasestorage.app",
+      messagingSenderId: "261596275032",
+      appId: "1:261596275032:web:113b153a5223e7f",
+      measurementId: "G-MCC0KK5FWE"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db = getFirestore(app);
+
+    // Audio Alert Synthesizer (No external mp3 needed)
+    let audioCtx = null;
+    let soundEnabled = false;
+
+    window.toggleSound = function() {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      soundEnabled = !soundEnabled;
+      const icon = document.getElementById("soundIcon");
+      const text = document.getElementById("soundText");
+      const btn = document.getElementById("soundToggleBtn");
+
+      if (soundEnabled) {
+        icon.className = "fa-solid fa-volume-high text-emerald-400";
+        text.innerText = "Sound On";
+        btn.classList.add("border-emerald-500");
+        playBellSound(); // Test ring
+      } else {
+        icon.className = "fa-solid fa-volume-xmark text-red-400";
+        text.innerText = "Sound Off";
+        btn.classList.remove("border-emerald-500");
+      }
+    };
+
+    function playBellSound() {
+      if (!soundEnabled || !audioCtx) return;
+
+      const now = audioCtx.currentTime;
+      
+      // Dual tone service bell sound
+      const osc1 = audioCtx.createOscillator();
+      const gain1 = audioCtx.createGain();
+      osc1.type = 'sine';
+      osc1.frequency.setValueAtTime(880, now); // A5 note
+      gain1.gain.setValueAtTime(0.3, now);
+      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+      osc1.connect(gain1);
+      gain1.connect(audioCtx.destination);
+      osc1.start(now);
+      osc1.stop(now + 0.8);
+
+      const osc2 = audioCtx.createOscillator();
+      const gain2 = audioCtx.createGain();
+      osc2.type = 'sine';
+      osc2.frequency.setValueAtTime(1760, now + 0.15); // A6 note
+      gain2.gain.setValueAtTime(0.3, now + 0.15);
+      gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+      osc2.connect(gain2);
+      gain2.connect(audioCtx.destination);
+      osc2.start(now + 0.15);
+      osc2.stop(now + 1.2);
+    }
+
+    let isInitialLoad = true;
+
+    // Real-time Firestore Listener
+    const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+
+    onSnapshot(q, (snapshot) => {
+      // Trigger sound only on new incoming orders (not initial page load)
+      if (!isInitialLoad) {
+        snapshot.docChanges().forEach((change) => {
+          if (change.type === "added") {
+            playBellSound();
+          }
+        });
+      }
+      isInitialLoad = false;
+
+      const container = document.getElementById("ordersContainer");
+      if (snapshot.empty) {
+        container.innerHTML = `<p class="text-slate-500 text-sm text-center col-span-full py-10">ఆర్డర్లు ఏమీ లేవు.</p>`;
+        return;
+      }
+
+      container.innerHTML = snapshot.docs.map(orderDoc => {
+        const order = orderDoc.data();
+        const id = orderDoc.id;
+        const isDone = order.status === "Completed";
+
+        const itemsList = (order.items || []).map(i => `
+          <div class="flex justify-between text-xs py-1 border-b border-slate-700/50">
+            <span class="text-slate-200">${i.name} <strong class="text-orange-400">x${i.quantity}</strong></span>
+            <span class="text-slate-400 font-semibold">₹${i.itemTotal}</span>
+          </div>
+        `).join('');
+
+        return `
+          <div class="bg-slate-800 rounded-xl p-4 border ${isDone ? 'border-slate-700 opacity-60' : 'border-orange-500/50 shadow-lg'} flex flex-col justify-between">
+            <div>
+              <div class="flex justify-between items-center mb-3">
+                <span class="px-2.5 py-1 rounded-md text-xs font-bold ${order.orderType === 'dinein' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}">
+                  ${order.tableNo}
+                </span>
+                <span class="text-xs font-semibold px-2 py-0.5 rounded ${isDone ? 'bg-slate-700 text-slate-300' : 'bg-amber-500/20 text-amber-300'}">
+                  ${order.status || 'New'}
+                </span>
+              </div>
+
+              <div class="space-y-1 mb-3">
+                ${itemsList}
+                ${order.parcelFee ? `
+                  <div class="flex justify-between text-xs py-1 text-slate-400">
+                    <span>Packing Fee</span>
+                    <span>₹${order.parcelFee}</span>
+                  </div>
+                ` : ''}
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-700 flex justify-between items-center mt-2">
+              <div>
+                <span class="text-[10px] text-slate-400 block uppercase">Total Bill</span>
+                <span class="text-base font-black text-white">₹${order.grandTotal}</span>
+              </div>
+              ${!isDone ? `
+                <button onclick="markComplete('${id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-bold px-3 py-1.5 rounded-lg transition active:scale-95">
+                  <i class="fa-solid fa-check"></i> Complete
+                </button>
+              ` : `
+                <span class="text-xs text-slate-400 font-medium"><i class="fa-solid fa-circle-check text-emerald-500"></i> Done</span>
+              `}
+            </div>
+          </div>
+        `;
+      }).join('');
+    });
+
+    window.markComplete = async function(id) {
+      await updateDoc(doc(db, "orders", id), {
+        status: "Completed"
+      });
+    };
+  </script>
+</body>
+</html>
