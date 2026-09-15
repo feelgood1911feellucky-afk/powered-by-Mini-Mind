@@ -1,9 +1,9 @@
-     <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TableTap - Digital Menu</title>
+  <title>Digital Menu - Powered by MiniMind</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   
@@ -39,9 +39,17 @@
       <div class="flex items-center gap-2">
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-xl font-black text-gray-800 tracking-wide flex items-center gap-1.5">
-              <i class="fa-solid fa-utensils text-orange-500"></i> TableTap
-            </h1>
+            <div>
+              <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest block leading-none mb-1">
+                Powered by
+              </span>
+              <h1 class="text-xl font-black tracking-wide text-orange-500 flex items-center gap-1.5 leading-none">
+                <i class="fa-solid fa-brain text-base"></i> MiniMind
+              </h1>
+              <p class="text-xs font-black text-gray-800 flex items-center gap-1.5 mt-1 tracking-wider uppercase">
+                <i class="fa-solid fa-utensils text-orange-500 text-[10px]"></i> Digital Menu
+              </p>
+            </div>
             
             <!-- 3-DOTS MENU BUTTON -->
             <div class="relative">
@@ -58,7 +66,7 @@
               </div>
             </div>
           </div>
-          <p id="tableBadge" class="text-base font-black text-orange-600 tracking-wide">Table 1</p>
+          <p id="tableBadge" class="text-base font-black text-orange-600 tracking-wide mt-1">Table 1</p>
         </div>
       </div>
       
@@ -116,7 +124,7 @@
       </p>
 
       <!-- ESTIMATED TIME BADGE -->
-      <div id="estimatedTimeBadge" class="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/70 py-1.5 rounded-xl transition-all">
+      <div class="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/70 py-1.5 rounded-xl">
         <i id="estimatedTimeIcon" class="fa-regular fa-clock text-emerald-600"></i>
         <span id="estimatedTimeText">Estimated Time: 20 - 30 mins</span>
       </div>
@@ -245,7 +253,8 @@
     }
     const db = firebase.firestore();
 
-    const FIXED_RESTAURANT_UPI = "9347685874-3@ybl"; 
+    // UPDATED RESTAURANT UPI ID
+    const FIXED_RESTAURANT_UPI = "9885554032@ybl"; 
     const PARCEL_SURCHARGE = 10;
 
     // URL నుండి టేబుల్ నంబర్ పొందడం
@@ -354,15 +363,15 @@
         const estText = document.getElementById("estimatedTimeText");
         const estIcon = document.getElementById("estimatedTimeIcon");
 
-        // కిచెన్ లో ఆర్డర్ Complete / Ready / Served అయినప్పుడు జరిగే టైమింగ్ లాజిక్
+        // కిచెన్ ఆర్డర్ Complete / Ready / Served అయినప్పుడు మారే టైమింగ్
         if (statusRaw.includes("complete") || statusRaw.includes("ready") || statusRaw.includes("served")) {
-          // 1. వెంటనే 2 - 3 mins చూపిస్తుంది
+          // 1. 20-30 mins నుండి 2-3 mins కి మారడం
           if (estText && !estText.innerText.includes("Enjoy") && !estText.innerText.includes("Thank you")) {
             estText.innerText = "Order Ready! Serving in 2 - 3 mins";
             if (estIcon) estIcon.className = "fa-solid fa-bell-concierge text-emerald-600 animate-bounce";
           }
 
-          // 2. 5 నిమిషాల (300 సెకన్ల) తర్వాత Enjoy your delicious meal!
+          // 2. 5 నిమిషాల (300 సెకన్లు) తర్వాత Enjoy meal రావడం
           if (!enjoyTimer) {
             enjoyTimer = setTimeout(() => {
               if (estText) {
@@ -372,7 +381,7 @@
                 estIcon.className = "fa-solid fa-heart text-red-500";
               }
 
-              // 3. Enjoy వచ్చిన సరిగ్గా 30 సెకన్ల తర్వాత Thank you! Order more anytime
+              // 3. Enjoy వచ్చిన సరిగ్గా 30 సెకన్ల తర్వాత Thank you రావడం
               thankYouTimer = setTimeout(() => {
                 if (estText) {
                   estText.innerText = "Thank you! Order more anytime 😊";
@@ -380,12 +389,12 @@
                 if (estIcon) {
                   estIcon.className = "fa-solid fa-utensils text-orange-500";
                 }
-              }, 30 * 1000); // 30 సెకన్లు
+              }, 30 * 1000);
 
-            }, 5 * 60 * 1000); // 5 నిమిషాలు
+            }, 5 * 60 * 1000);
           }
         } else {
-          // ఆర్డర్ ఇంకా ప్రిపేర్ అవుతుంటే పాత డిఫాల్ట్ టైమ్
+          // ప్రిపరేషన్ టైంలో డిఫాల్ట్ టైమ్
           if (enjoyTimer) {
             clearTimeout(enjoyTimer);
             enjoyTimer = null;
@@ -883,7 +892,7 @@
       let grandTotal = Object.values(cart).reduce((s, i) => s + (i.qty * i.price), 0);
 
       if (!isDemo) {
-        const upiUrl = `upi://pay?pa=${encodeURIComponent(FIXED_RESTAURANT_UPI)}&pn=TableTap&am=${grandTotal}&cu=INR&tn=TableTap%20Order`;
+        const upiUrl = `upi://pay?pa=${encodeURIComponent(FIXED_RESTAURANT_UPI)}&pn=TableTap&am=${grandTotal}&cu=INR&tn=MiniMind%20Order`;
         const link = document.createElement("a");
         link.href = upiUrl;
         link.rel = "noreferrer";
@@ -927,7 +936,6 @@
           existingHistory = [];
         }
 
-        // కస్టమర్ కోసం కేవలం Date, Time, Items మాత్రమే స్టోర్ అవుతాయి
         const newHistoryRecord = {
           orderId: orderRef.id,
           orderDate: dateStr,
@@ -963,4 +971,3 @@
   </script>
 </body>
 </html>
-           
