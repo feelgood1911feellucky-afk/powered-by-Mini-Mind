@@ -368,15 +368,15 @@
         const estText = document.getElementById("estimatedTimeText");
         const estIcon = document.getElementById("estimatedTimeIcon");
 
-        // కిచెన్ ఆర్డర్ Complete / Ready / Served అయినప్పుడు మారే టైమింగ్
+        // కిచెన్ ఆర్డర్ Complete / Ready / Served అయినప్పుడు మారే టైమింగ్ (TEST MODE: 20 SECONDS)
         if (statusRaw.includes("complete") || statusRaw.includes("ready") || statusRaw.includes("served")) {
-          // 1. 20-30 mins నుండి 2-3 mins కి మారడం
+          // 1. వెంటనే 20 సెకన్ల సర్వింగ్ మెసేజ్
           if (estText && !estText.innerText.includes("Enjoy") && !estText.innerText.includes("Thank you")) {
-            estText.innerText = "Order Ready! Serving in 2 - 3 mins";
+            estText.innerText = "Order Ready! Serving in 20 secs";
             if (estIcon) estIcon.className = "fa-solid fa-bell-concierge text-emerald-600 animate-bounce";
           }
 
-          // 2. 5 నిమిషాల (300 సెకన్లు) తర్వాత Enjoy meal రావడం
+          // 2. సరిగ్గా 20 సెకన్ల తర్వాత Enjoy meal రావడం
           if (!enjoyTimer) {
             enjoyTimer = setTimeout(() => {
               if (estText) {
@@ -386,7 +386,7 @@
                 estIcon.className = "fa-solid fa-heart text-red-500";
               }
 
-              // 3. Enjoy వచ్చిన సరిగ్గా 30 సెకన్ల తర్వాత Thank you రావడం
+              // 3. Enjoy వచ్చిన సరిగ్గా 20 సెకన్ల తర్వాత Thank you రావడం
               thankYouTimer = setTimeout(() => {
                 if (estText) {
                   estText.innerText = "Thank you! Order more anytime 😊";
@@ -394,9 +394,9 @@
                 if (estIcon) {
                   estIcon.className = "fa-solid fa-utensils text-orange-500";
                 }
-              }, 30 * 1000);
+              }, 20 * 1000); // 20 సెకన్లు
 
-            }, 5 * 60 * 1000);
+            }, 20 * 1000); // 20 సెకన్లు
           }
         } else {
           // ప్రిపరేషన్ టైంలో డిఫాల్ట్ టైమ్
