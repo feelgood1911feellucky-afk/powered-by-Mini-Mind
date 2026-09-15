@@ -9,6 +9,21 @@
 </head>
 <body class="bg-slate-900 text-gray-100 min-h-screen p-4 select-none">
 
+  <!-- FIRST TOUCH AUDIO UNLOCK OVERLAY (బ్రౌజర్ సౌండ్ బ్లాక్ చేయకుండా ఉండటానికి) -->
+  <div id="soundActivationOverlay" class="fixed inset-0 bg-slate-950/90 z-50 flex flex-col items-center justify-center p-6 text-center">
+    <div class="w-20 h-20 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-4xl mb-4 animate-bounce">
+      <i class="fa-solid fa-bell"></i>
+    </div>
+    <h2 class="text-2xl font-black text-white mb-2">Kitchen Live Audio</h2>
+    <p class="text-sm text-slate-300 max-w-xs mb-6">
+      ఆర్డర్ సౌండ్ ఆన్ చేయడానికి స్క్రీన్‌పై ఎక్కడైనా ఒకసారి టచ్ చేయండి.
+    </p>
+    <button onclick="enableSoundDirectly()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base px-8 py-3.5 rounded-2xl shadow-lg shadow-emerald-600/40 active:scale-95 transition flex items-center gap-2">
+      <i class="fa-solid fa-volume-high"></i>
+      <span>START KITCHEN (SOUND ON)</span>
+    </button>
+  </div>
+
   <!-- Header -->
   <header class="max-w-4xl mx-auto flex justify-between items-center pb-4 border-b border-slate-700">
     <div>
@@ -19,9 +34,9 @@
     </div>
     <div class="flex items-center gap-3">
       <!-- Sound Enable Button -->
-      <button id="soundToggleBtn" onclick="toggleSound()" class="bg-slate-800 border border-slate-700 hover:border-orange-500 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300 transition">
-        <i id="soundIcon" class="fa-solid fa-volume-xmark text-red-400"></i>
-        <span id="soundText">Sound Off</span>
+      <button id="soundToggleBtn" onclick="toggleSound()" class="bg-slate-800 border border-emerald-500 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300 transition">
+        <i id="soundIcon" class="fa-solid fa-volume-high text-emerald-400"></i>
+        <span id="soundText">Sound On</span>
       </button>
       <div class="flex items-center gap-1.5">
         <span class="inline-block w-2.5 h-2.5 bg-emerald-500 rounded-full animate-pulse"></span>
@@ -55,18 +70,48 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Audio Alert Synthesizer (No external mp3 needed)
+    // Audio Alert Synthesizer
     let audioCtx = null;
-    let soundEnabled = false;
+    let soundEnabled = true; // By default ON లోనే ఉంటుంది
 
-    window.toggleSound = function() {
+    function initAudio() {
       if (!audioCtx) {
         audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       }
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
+    }
 
+    // మొదటి టచ్‌తో సౌండ్ యాక్టివేట్ చేసే ఫంక్షన్
+    window.enableSoundDirectly = function() {
+      initAudio();
+      soundEnabled = true;
+      const overlay = document.getElementById("soundActivationOverlay");
+      if (overlay) overlay.classList.add("hidden");
+      
+      const icon = document.getElementById("soundIcon");
+      const text = document.getElementById("soundText");
+      const btn = document.getElementById("soundToggleBtn");
+
+      icon.className = "fa-solid fa-volume-high text-emerald-400";
+      text.innerText = "Sound On";
+      btn.classList.add("border-emerald-500");
+
+      playBellSound(); // సౌండ్ వర్క్ అవుతుందని చిన్న బెల్ రింగ్
+    };
+
+    // స్క్రీన్‌పై ఎక్కడ క్లిక్ చేసినా సౌండ్ అన్‌లాక్ అవుతుంది
+    document.addEventListener("click", () => {
+      initAudio();
+      const overlay = document.getElementById("soundActivationOverlay");
+      if (overlay && !overlay.classList.contains("hidden")) {
+        window.enableSoundDirectly();
+      }
+    }, { once: true });
+
+    window.toggleSound = function() {
+      initAudio();
       soundEnabled = !soundEnabled;
       const icon = document.getElementById("soundIcon");
       const text = document.getElementById("soundText");
@@ -76,7 +121,7 @@
         icon.className = "fa-solid fa-volume-high text-emerald-400";
         text.innerText = "Sound On";
         btn.classList.add("border-emerald-500");
-        playBellSound(); // Test ring
+        playBellSound();
       } else {
         icon.className = "fa-solid fa-volume-xmark text-red-400";
         text.innerText = "Sound Off";
@@ -85,7 +130,9 @@
     };
 
     function playBellSound() {
-      if (!soundEnabled || !audioCtx) return;
+      if (!soundEnabled) return;
+      initAudio();
+      if (!audioCtx) return;
 
       const now = audioCtx.currentTime;
       
@@ -119,7 +166,7 @@
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
 
     onSnapshot(q, (snapshot) => {
-      // Trigger sound only on new incoming orders (not initial page load)
+      // కొత్త ఆర్డర్ వచ్చినప్పుడు మాత్రమే సౌండ్ ప్లే అవుతుంది
       if (!isInitialLoad) {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added") {
