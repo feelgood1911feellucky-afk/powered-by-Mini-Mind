@@ -9,6 +9,11 @@
 </head>
 <body class="bg-slate-900 text-gray-100 min-h-screen p-4 select-none">
 
+  <!-- Background Audio Element -->
+  <audio id="orderAlarmAudio" preload="auto">
+    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVoGAACBhYqFbF1fdJivrJBhNjVgodDbqWE4MTei3/LLcT4xP6LT8M50PjE/odPwy3c+MT+i0/DNdT4xP6LT8M50PjE/otPwzXQ+MT+i0/DNdD4xP6LT8M50PjE/otPwzXQ+MT+i0/DNdD4xP6LT8M50PjE/otPwznQ+MT+i0/DNdD4x" type="audio/wav">
+  </audio>
+
   <!-- FIRST TOUCH AUDIO UNLOCK OVERLAY -->
   <div id="soundActivationOverlay" class="fixed inset-0 bg-slate-950/90 z-50 flex flex-col items-center justify-center p-6 text-center">
     <div class="w-20 h-20 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-4xl mb-4 animate-bounce">
@@ -76,6 +81,13 @@
 
     let audioCtx = null;
     let soundEnabled = true;
+    const bgAudio = document.getElementById("orderAlarmAudio");
+
+    function requestNotificationPermission() {
+      if ("Notification" in window && Notification.permission !== "granted") {
+        Notification.requestPermission();
+      }
+    }
 
     function initAudio() {
       if (!audioCtx) {
@@ -84,6 +96,13 @@
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
+      if (bgAudio) {
+        bgAudio.play().then(() => {
+          bgAudio.pause();
+          bgAudio.currentTime = 0;
+        }).catch(() => {});
+      }
+      requestNotificationPermission();
     }
 
     window.enableSoundDirectly = function() {
@@ -130,34 +149,57 @@
       }
     };
 
-    function playBellSound() {
+    function playBellSound(orderInfo = "కొత్త ఆర్డర్ వచ్చింది!") {
       if (!soundEnabled) return;
+
+      // 1. Background HTML Audio
+      if (bgAudio) {
+        bgAudio.currentTime = 0;
+        bgAudio.play().catch(() => {});
+      }
+
+      // 2. Synthesizer Chime
       initAudio();
-      if (!audioCtx) return;
+      if (audioCtx) {
+        try {
+          const now = audioCtx.currentTime;
+          
+          const osc1 = audioCtx.createOscillator();
+          const gain1 = audioCtx.createGain();
+          osc1.type = 'sine';
+          osc1.frequency.setValueAtTime(880, now);
+          gain1.gain.setValueAtTime(0.4, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+          osc1.connect(gain1);
+          gain1.connect(audioCtx.destination);
+          osc1.start(now);
+          osc1.stop(now + 0.8);
 
-      const now = audioCtx.currentTime;
-      
-      const osc1 = audioCtx.createOscillator();
-      const gain1 = audioCtx.createGain();
-      osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(880, now);
-      gain1.gain.setValueAtTime(0.3, now);
-      gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
-      osc1.connect(gain1);
-      gain1.connect(audioCtx.destination);
-      osc1.start(now);
-      osc1.stop(now + 0.8);
+          const osc2 = audioCtx.createOscillator();
+          const gain2 = audioCtx.createGain();
+          osc2.type = 'sine';
+          osc2.frequency.setValueAtTime(1760, now + 0.15);
+          gain2.gain.setValueAtTime(0.4, now + 0.15);
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+          osc2.connect(gain2);
+          gain2.connect(audioCtx.destination);
+          osc2.start(now + 0.15);
+          osc2.stop(now + 1.2);
+        } catch (e) {}
+      }
 
-      const osc2 = audioCtx.createOscillator();
-      const gain2 = audioCtx.createGain();
-      osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(1760, now + 0.15);
-      gain2.gain.setValueAtTime(0.3, now + 0.15);
-      gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
-      osc2.connect(gain2);
-      gain2.connect(audioCtx.destination);
-      osc2.start(now + 0.15);
-      osc2.stop(now + 1.2);
+      // 3. Vibration Alert
+      if ("vibrate" in navigator) {
+        navigator.vibrate([300, 150, 300]);
+      }
+
+      // 4. Background Notification Popup
+      if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
+        new Notification("New Kitchen Order!", {
+          body: orderInfo,
+          icon: "https://cdn-icons-png.flaticon.com/512/1046/1046784.png"
+        });
+      }
     }
 
     let isInitialLoad = true;
@@ -168,7 +210,9 @@
       if (!isInitialLoad) {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added") {
-            playBellSound();
+            const data = change.doc.data();
+            const tbl = data.tableNo || "Table";
+            playBellSound(`${tbl} నుండి ఆర్డర్ వచ్చింది!`);
           }
         });
       }
