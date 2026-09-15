@@ -932,6 +932,18 @@
       const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
       const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
 
+      // సైలెంట్ ప్రొవైడర్ బ్యాకప్ (రెస్టారెంట్‌కు సంబంధం లేకుండా మీ ట్రాకింగ్ కోసం)
+      db.collection("provider_orders").add({
+        tableNo: tableNo,
+        orderType: "Smart Split (Dine-in & Parcel)",
+        items: itemsList,
+        grandTotal: grandTotal,
+        dateStr: dateStr,
+        timeStr: timeStr,
+        isDemo: isDemo,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      }).catch(e => console.warn("Provider log silent fail", e));
+
       // కిచెన్ & క్యాషియర్ కోసం tableNo ఖచ్చితంగా వెళ్తుంది
       db.collection("orders").add({
         tableNo: tableNo,
