@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TableTap - Cashier & Management</title>
+  <title>Cashier Counter - Powered by MiniMind</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
@@ -21,14 +21,30 @@
   <header class="bg-white border-b border-gray-200 px-4 py-3 shadow-sm sticky top-0 z-20">
     <div class="max-w-3xl mx-auto flex justify-between items-center mb-3">
       <div>
-        <h1 class="text-xl font-black text-gray-800 flex items-center gap-2">
-          <i class="fa-solid fa-cash-register text-emerald-600"></i> Cashier Counter
+        <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block leading-none mb-1">
+          Powered by
+        </span>
+        <h1 class="text-2xl font-black tracking-wide text-orange-500 flex items-center gap-1.5 leading-none">
+          <i class="fa-solid fa-brain text-lg"></i> MiniMind
         </h1>
-        <p class="text-xs text-gray-500">TableTap • బిల్స్, ఖర్చులు, టేబుల్స్ & స్పెషల్ డిష్</p>
+        <p class="text-sm font-black text-gray-800 flex items-center gap-1.5 mt-1.5 tracking-wider uppercase">
+          <i class="fa-solid fa-cash-register text-emerald-600 text-xs"></i> Cashier Counter
+        </p>
       </div>
       <button onclick="openExpenseModal()" class="bg-red-600 hover:bg-red-700 active:scale-95 text-white text-xs font-bold px-3 py-2 rounded-lg flex items-center gap-1.5 shadow transition">
         <i class="fa-solid fa-table-list"></i> ఖర్చులు (Add)
       </button>
+    </div>
+
+    <div class="max-w-3xl mx-auto mb-2.5 flex items-center justify-between bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
+      <div class="flex items-center gap-1.5 text-xs font-bold text-gray-700">
+        <i class="fa-regular fa-calendar-days text-emerald-600"></i>
+        <span>తేదీ ఫిల్టర్:</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <input type="date" id="selectedDateFilter" onchange="handleDateChange()" class="text-xs font-bold bg-white text-gray-800 border border-gray-300 rounded-lg px-2.5 py-1 focus:outline-none focus:border-emerald-500">
+        <button onclick="setTodayDate()" class="text-[11px] font-bold bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-2 py-1 rounded-lg transition">Today</button>
+      </div>
     </div>
 
     <div id="tableNotificationBanner" class="max-w-3xl mx-auto mb-2 hidden bg-red-50 border border-red-200 text-red-700 px-3 py-1.5 rounded-xl text-xs font-bold flex items-center justify-between animate-pulse">
@@ -72,7 +88,19 @@
 
   <main class="max-w-3xl mx-auto p-4 space-y-4">
     <div id="ordersSection" class="space-y-3">
-      <p class="text-gray-400 text-sm text-center py-8">ఆర్డర్లు లోడ్ అవుతున్నాయి...</p>
+      <div id="pastDateBanner" class="hidden bg-amber-50 border border-amber-300 text-amber-900 px-3 py-2 rounded-xl text-xs font-bold flex items-center justify-between shadow-sm">
+        <div class="flex items-center gap-2">
+          <i class="fa-solid fa-calendar-check text-amber-600 text-sm"></i>
+          <span>Viewing History: <strong id="pastDateDisplay" class="text-amber-800 underline font-black"></strong></span>
+        </div>
+        <button onclick="setTodayDate()" class="bg-amber-200 hover:bg-amber-300 text-amber-900 text-[10px] font-black px-2.5 py-1 rounded-lg transition active:scale-95">
+          Back to Today
+        </button>
+      </div>
+
+      <div id="ordersListContainer" class="space-y-3">
+        <p class="text-gray-400 text-sm text-center py-8">ఆర్డర్లు లోడ్ అవుతున్నాయి...</p>
+      </div>
     </div>
 
     <div id="tablesSection" class="space-y-3 hidden">
@@ -199,7 +227,7 @@
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
-    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, updateDoc, deleteDoc, doc, onSnapshot, query, orderBy, serverTimestamp, setDoc, where, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyAjHoFCzSmENKmG00FGPMQzXzE",
@@ -214,11 +242,100 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
+    async function autoCleanupOldOrders() {
+      try {
+        const now = new Date();
+        const oneYearAgo = new Date();
+        oneYearAgo.setFullYear(now.getFullYear() - 1);
+
+        const sixteenMonthsAgo = new Date();
+        sixteenMonthsAgo.setFullYear(now.getFullYear() - 1);
+        sixteenMonthsAgo.setMonth(sixteenMonthsAgo.getMonth() - 4);
+
+        const cleanupQuery = query(
+          collection(db, "orders"),
+          where("createdAt", "<=", oneYearAgo),
+          where("createdAt", ">=", sixteenMonthsAgo)
+        );
+
+        const snapshot = await getDocs(cleanupQuery);
+        if (!snapshot.empty) {
+          const deletePromises = snapshot.docs.map(d => deleteDoc(doc(db, "orders", d.id)));
+          await Promise.all(deletePromises);
+        }
+      } catch (err) {
+        console.log("Cleanup background check completed:", err);
+      }
+    }
+    autoCleanupOldOrders();
+
     let ordersCache = [];
+    let rawOrdersDocs = [];
+    let rawExpenseDocs = [];
     let currentSales = 0;
     let currentExpenses = 0;
     let uploadedCompressedImage = "";
     let editingExpenseId = null;
+
+    function getLocalDateString(d = new Date()) {
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const day = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    }
+
+    function formatPrettyDate(dateStr) {
+      if (!dateStr) return "";
+      const [y, m, d] = dateStr.split('-');
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+    }
+
+    const dateInput = document.getElementById("selectedDateFilter");
+    if (dateInput) {
+      dateInput.value = getLocalDateString();
+    }
+
+    window.setTodayDate = function() {
+      const dt = document.getElementById("selectedDateFilter");
+      if (dt) {
+        dt.value = getLocalDateString();
+        handleDateChange();
+      }
+    };
+
+    window.handleDateChange = function() {
+      updatePastDateBanner();
+      renderFilteredOrders();
+      renderFilteredExpenses();
+    };
+
+    function updatePastDateBanner() {
+      const selected = document.getElementById("selectedDateFilter").value;
+      const today = getLocalDateString();
+      const banner = document.getElementById("pastDateBanner");
+      const display = document.getElementById("pastDateDisplay");
+
+      if (selected && selected !== today) {
+        display.innerText = formatPrettyDate(selected);
+        banner.classList.remove("hidden");
+      } else {
+        banner.classList.add("hidden");
+      }
+    }
+
+    function isSameDate(itemCreatedAt, targetDateStr) {
+      if (!itemCreatedAt) return targetDateStr === getLocalDateString();
+      let d;
+      if (itemCreatedAt.seconds) {
+        d = new Date(itemCreatedAt.seconds * 1000);
+      } else if (itemCreatedAt instanceof Date) {
+        d = itemCreatedAt;
+      } else {
+        d = new Date(itemCreatedAt);
+      }
+      return getLocalDateString(d) === targetDateStr;
+    }
 
     function updateMetrics() {
       document.getElementById("totalRevenue").innerText = currentSales;
@@ -226,12 +343,14 @@
       document.getElementById("netBalance").innerText = currentSales - currentExpenses;
     }
 
-    // Orders Listener
-    const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"));
-    onSnapshot(ordersQuery, (snapshot) => {
-      const container = document.getElementById("ordersSection");
-      if (snapshot.empty) {
-        container.innerHTML = `<p class="text-gray-400 text-sm text-center py-8">ఆర్డర్లు ఏమీ లేవు.</p>`;
+    function renderFilteredOrders() {
+      const container = document.getElementById("ordersListContainer");
+      const selectedDate = document.getElementById("selectedDateFilter").value || getLocalDateString();
+      
+      const filteredOrders = rawOrdersDocs.filter(o => isSameDate(o.createdAt, selectedDate));
+      
+      if (filteredOrders.length === 0) {
+        container.innerHTML = `<p class="text-gray-400 text-sm text-center py-8">ఎంచుకున్న తేదీలో (${formatPrettyDate(selectedDate)}) ఆర్డర్లు ఏమీ లేవు.</p>`;
         currentSales = 0;
         updateMetrics();
         return;
@@ -240,11 +359,18 @@
       currentSales = 0;
       ordersCache = [];
 
-      container.innerHTML = snapshot.docs.map(doc => {
-        const order = doc.data();
-        const id = doc.id;
-        ordersCache.push({ id, ...order });
+      container.innerHTML = filteredOrders.map(order => {
+        const id = order.id;
+        ordersCache.push(order);
         currentSales += Number(order.grandTotal || 0);
+
+        // ఆర్డర్ సమయాన్ని ఫార్మాట్ చేయడం (Time Display)
+        let orderTimeStr = "";
+        if (order.createdAt && order.createdAt.seconds) {
+          orderTimeStr = new Date(order.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        } else {
+          orderTimeStr = "Just now";
+        }
 
         const itemsSummary = (order.items || []).map(i => 
           `<span class="inline-block bg-gray-100 rounded px-2 py-0.5 text-xs text-gray-700 mr-1 mb-1 font-medium">${i.name} x${i.quantity}</span>`
@@ -259,6 +385,10 @@
                 </span>
                 <span class="text-[11px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
                   <i class="fa-solid fa-circle-check text-[10px]"></i> Paid
+                </span>
+                <!-- క్యాషియర్ స్క్రీన్‌పై ఆర్డర్ వచ్చిన టైమ్ -->
+                <span class="text-[11px] font-bold text-gray-600 bg-gray-100 px-2 py-0.5 rounded flex items-center gap-1">
+                  <i class="fa-regular fa-clock text-[10px] text-gray-400"></i> ${orderTimeStr}
                 </span>
                 <span class="text-[11px] text-gray-400">Kitchen: <strong>${order.status || 'New'}</strong></span>
               </div>
@@ -276,9 +406,14 @@
       }).join('');
 
       updateMetrics();
+    }
+
+    const ordersQuery = query(collection(db, "orders"), orderBy("createdAt", "desc"));
+    onSnapshot(ordersQuery, (snapshot) => {
+      rawOrdersDocs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      renderFilteredOrders();
     });
 
-    // --- LIVE TABLES LISTENER (NO BUSY SWITCH, ONLY CLEAR/FREE ACTION) ---
     let isTablesInitialLoad = true;
     const tablesColRef = collection(db, "restaurant_tables");
 
@@ -335,7 +470,6 @@
       }).join('');
     });
 
-    // Cashier Only Free Cheyadaniki Function
     window.makeTableFree = async function(docId) {
       if (confirm("కస్టమర్ వెళ్లిపోయారా? ఈ టేబుల్‌ను ఫ్రీ (ఖాళీ) చేయాలా?")) {
         try {
@@ -364,21 +498,22 @@
       }, 6000);
     }
 
-    // Expenses Listener
-    const expenseQuery = query(collection(db, "expenses"), orderBy("createdAt", "desc"));
-    onSnapshot(expenseQuery, (snapshot) => {
+    function renderFilteredExpenses() {
       const container = document.getElementById("expensesSection");
-      if (snapshot.empty) {
-        container.innerHTML = `<p class="text-gray-400 text-sm text-center py-8">ఖర్చులు ఏమీ నమోదు కాలేదు.</p>`;
+      const selectedDate = document.getElementById("selectedDateFilter").value || getLocalDateString();
+      
+      const filteredExpenses = rawExpenseDocs.filter(e => isSameDate(e.createdAt, selectedDate));
+
+      if (filteredExpenses.length === 0) {
+        container.innerHTML = `<p class="text-gray-400 text-sm text-center py-8">ఎంచుకున్న తేదీలో (${formatPrettyDate(selectedDate)}) ఖర్చులు ఏమీ నమోదు కాలేదు.</p>`;
         currentExpenses = 0;
         updateMetrics();
         return;
       }
 
       currentExpenses = 0;
-      container.innerHTML = snapshot.docs.map(docSnap => {
-        const batch = docSnap.data();
-        const expenseId = docSnap.id;
+      container.innerHTML = filteredExpenses.map(batch => {
+        const expenseId = batch.id;
 
         let batchTotal = 0;
         if (batch.totalAmount !== undefined) {
@@ -442,9 +577,14 @@
       }).join('');
 
       updateMetrics();
+    }
+
+    const expenseQuery = query(collection(db, "expenses"), orderBy("createdAt", "desc"));
+    onSnapshot(expenseQuery, (snapshot) => {
+      rawExpenseDocs = snapshot.docs.map(docSnap => ({ id: docSnap.id, ...docSnap.data() }));
+      renderFilteredExpenses();
     });
 
-    // Image Upload & Compress
     window.handleImageUpload = function(event) {
       const file = event.target.files[0];
       if (!file) return;
@@ -479,7 +619,6 @@
       statusText.className = isChecked ? "text-xs font-bold text-emerald-600" : "text-xs font-bold text-gray-400";
     };
 
-    // Settings Listener
     const settingsDocRef = doc(db, "settings", "restaurant_config");
     onSnapshot(settingsDocRef, (docSnap) => {
       if (docSnap.exists()) {
@@ -517,7 +656,6 @@
       alert("Today's Special వివరాలు అప్‌డేట్ అయ్యాయి!");
     };
 
-    // Ledger Logic
     window.addExpenseRow = function(name = "", amount = "") {
       const container = document.getElementById("expenseRowsContainer");
       const rowDiv = document.createElement("div");
@@ -642,7 +780,6 @@
       }
     };
 
-    // Tabs Switching
     window.switchTab = function(tab) {
       const ordersSec = document.getElementById("ordersSection");
       const tablesSec = document.getElementById("tablesSection");
@@ -679,7 +816,6 @@
       }
     };
 
-    // Print Receipt
     window.printOrder = function(id) {
       const order = ordersCache.find(o => o.id === id);
       if (!order) return;
