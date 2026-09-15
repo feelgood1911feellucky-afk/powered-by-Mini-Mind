@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+     <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
@@ -116,9 +116,9 @@
       </p>
 
       <!-- ESTIMATED TIME BADGE -->
-      <div class="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/70 py-1.5 rounded-xl">
-        <i class="fa-regular fa-clock text-emerald-600"></i>
-        <span>Estimated Time: 20 - 30 mins</span>
+      <div id="estimatedTimeBadge" class="mt-2 pt-2 border-t border-emerald-200 flex items-center justify-center gap-1.5 text-[11px] font-bold text-emerald-800 bg-emerald-100/70 py-1.5 rounded-xl transition-all">
+        <i id="estimatedTimeIcon" class="fa-regular fa-clock text-emerald-600"></i>
+        <span id="estimatedTimeText">Estimated Time: 20 - 30 mins</span>
       </div>
     </div>
     
@@ -261,6 +261,8 @@
     const tableRef = db.collection("restaurant_tables").doc(tableDocId);
 
     let activeOrderUnsubscribe = null;
+    let enjoyTimer = null;
+    let thankYouTimer = null;
 
     let mySessionId = localStorage.getItem("customer_session_" + tableDocId);
     if (!mySessionId) {
@@ -293,6 +295,15 @@
           if (activeOrderUnsubscribe) {
             activeOrderUnsubscribe();
             activeOrderUnsubscribe = null;
+          }
+
+          if (enjoyTimer) {
+            clearTimeout(enjoyTimer);
+            enjoyTimer = null;
+          }
+          if (thankYouTimer) {
+            clearTimeout(thankYouTimer);
+            thankYouTimer = null;
           }
 
           if (activeCard) {
@@ -336,8 +347,56 @@
         const oData = docSnap.data();
         if (card) card.classList.remove("hidden");
 
+        const statusRaw = (oData.status || '').toLowerCase();
         document.getElementById("liveKitchenStatus").innerText = "Kitchen: " + (oData.status || 'Received');
         document.getElementById("liveOrderTotal").innerText = oData.grandTotal || '0';
+
+        const estText = document.getElementById("estimatedTimeText");
+        const estIcon = document.getElementById("estimatedTimeIcon");
+
+        // కిచెన్ లో ఆర్డర్ Complete / Ready / Served అయినప్పుడు జరిగే టైమింగ్ లాజిక్
+        if (statusRaw.includes("complete") || statusRaw.includes("ready") || statusRaw.includes("served")) {
+          // 1. వెంటనే 2 - 3 mins చూపిస్తుంది
+          if (estText && !estText.innerText.includes("Enjoy") && !estText.innerText.includes("Thank you")) {
+            estText.innerText = "Order Ready! Serving in 2 - 3 mins";
+            if (estIcon) estIcon.className = "fa-solid fa-bell-concierge text-emerald-600 animate-bounce";
+          }
+
+          // 2. 5 నిమిషాల (300 సెకన్ల) తర్వాత Enjoy your delicious meal!
+          if (!enjoyTimer) {
+            enjoyTimer = setTimeout(() => {
+              if (estText) {
+                estText.innerText = "Enjoy your delicious meal! 🍽️✨";
+              }
+              if (estIcon) {
+                estIcon.className = "fa-solid fa-heart text-red-500";
+              }
+
+              // 3. Enjoy వచ్చిన సరిగ్గా 30 సెకన్ల తర్వాత Thank you! Order more anytime
+              thankYouTimer = setTimeout(() => {
+                if (estText) {
+                  estText.innerText = "Thank you! Order more anytime 😊";
+                }
+                if (estIcon) {
+                  estIcon.className = "fa-solid fa-utensils text-orange-500";
+                }
+              }, 30 * 1000); // 30 సెకన్లు
+
+            }, 5 * 60 * 1000); // 5 నిమిషాలు
+          }
+        } else {
+          // ఆర్డర్ ఇంకా ప్రిపేర్ అవుతుంటే పాత డిఫాల్ట్ టైమ్
+          if (enjoyTimer) {
+            clearTimeout(enjoyTimer);
+            enjoyTimer = null;
+          }
+          if (thankYouTimer) {
+            clearTimeout(thankYouTimer);
+            thankYouTimer = null;
+          }
+          if (estText) estText.innerText = "Estimated Time: 20 - 30 mins";
+          if (estIcon) estIcon.className = "fa-regular fa-clock text-emerald-600";
+        }
 
         const itemsBox = document.getElementById("liveOrderItems");
         itemsBox.innerHTML = (oData.items || []).map(it => `
@@ -904,3 +963,4 @@
   </script>
 </body>
 </html>
+           
