@@ -1,15 +1,15 @@
-       <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>TableTap - Kitchen & Cashier Live Orders</title>
+  <title>Kitchen Live - Powered by MiniMind</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 </head>
 <body class="bg-slate-900 text-gray-100 min-h-screen p-4 select-none">
 
-  <!-- FIRST TOUCH AUDIO UNLOCK OVERLAY (బ్రౌజర్ సౌండ్ బ్లాక్ చేయకుండా ఉండటానికి) -->
+  <!-- FIRST TOUCH AUDIO UNLOCK OVERLAY -->
   <div id="soundActivationOverlay" class="fixed inset-0 bg-slate-950/90 z-50 flex flex-col items-center justify-center p-6 text-center">
     <div class="w-20 h-20 bg-emerald-500/20 text-emerald-400 rounded-full flex items-center justify-center text-4xl mb-4 animate-bounce">
       <i class="fa-solid fa-bell"></i>
@@ -27,13 +27,17 @@
   <!-- Header -->
   <header class="max-w-4xl mx-auto flex justify-between items-center pb-4 border-b border-slate-700">
     <div>
-      <h1 class="text-xl font-black tracking-wide text-orange-500 flex items-center gap-2">
-        <i class="fa-solid fa-bell-concierge"></i> TableTap Kitchen Live
+      <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest block leading-none mb-1">
+        Powered by
+      </span>
+      <h1 class="text-2xl font-black tracking-wide text-orange-500 flex items-center gap-1.5 leading-none">
+        <i class="fa-solid fa-brain text-lg"></i> MiniMind
       </h1>
-      <p class="text-xs text-slate-400">Bawarchi Restaurant • లైవ్ ఆర్డర్ల స్క్రీన్</p>
+      <p class="text-sm font-black text-slate-200 flex items-center gap-1.5 mt-1.5 tracking-wider uppercase">
+        <i class="fa-solid fa-bell-concierge text-orange-400 text-xs"></i> Kitchen Live
+      </p>
     </div>
     <div class="flex items-center gap-3">
-      <!-- Sound Enable Button -->
       <button id="soundToggleBtn" onclick="toggleSound()" class="bg-slate-800 border border-emerald-500 text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 text-slate-300 transition">
         <i id="soundIcon" class="fa-solid fa-volume-high text-emerald-400"></i>
         <span id="soundText">Sound On</span>
@@ -70,9 +74,8 @@
     const app = initializeApp(firebaseConfig);
     const db = getFirestore(app);
 
-    // Audio Alert Synthesizer
     let audioCtx = null;
-    let soundEnabled = true; // By default ON లోనే ఉంటుంది
+    let soundEnabled = true;
 
     function initAudio() {
       if (!audioCtx) {
@@ -83,7 +86,6 @@
       }
     }
 
-    // మొదటి టచ్‌తో సౌండ్ యాక్టివేట్ చేసే ఫంక్షన్
     window.enableSoundDirectly = function() {
       initAudio();
       soundEnabled = true;
@@ -98,10 +100,9 @@
       text.innerText = "Sound On";
       btn.classList.add("border-emerald-500");
 
-      playBellSound(); // సౌండ్ వర్క్ అవుతుందని చిన్న బెల్ రింగ్
+      playBellSound();
     };
 
-    // స్క్రీన్‌పై ఎక్కడ క్లిక్ చేసినా సౌండ్ అన్‌లాక్ అవుతుంది
     document.addEventListener("click", () => {
       initAudio();
       const overlay = document.getElementById("soundActivationOverlay");
@@ -136,11 +137,10 @@
 
       const now = audioCtx.currentTime;
       
-      // Dual tone service bell sound
       const osc1 = audioCtx.createOscillator();
       const gain1 = audioCtx.createGain();
       osc1.type = 'sine';
-      osc1.frequency.setValueAtTime(880, now); // A5 note
+      osc1.frequency.setValueAtTime(880, now);
       gain1.gain.setValueAtTime(0.3, now);
       gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
       osc1.connect(gain1);
@@ -151,7 +151,7 @@
       const osc2 = audioCtx.createOscillator();
       const gain2 = audioCtx.createGain();
       osc2.type = 'sine';
-      osc2.frequency.setValueAtTime(1760, now + 0.15); // A6 note
+      osc2.frequency.setValueAtTime(1760, now + 0.15);
       gain2.gain.setValueAtTime(0.3, now + 0.15);
       gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
       osc2.connect(gain2);
@@ -162,11 +162,9 @@
 
     let isInitialLoad = true;
 
-    // Real-time Firestore Listener
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
 
     onSnapshot(q, (snapshot) => {
-      // కొత్త ఆర్డర్ వచ్చినప్పుడు మాత్రమే సౌండ్ ప్లే అవుతుంది
       if (!isInitialLoad) {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added") {
@@ -187,6 +185,14 @@
         const id = orderDoc.id;
         const isDone = order.status === "Completed";
 
+        // ఆర్డర్ సమయాన్ని ఫార్మాట్ చేయడం (Time Display)
+        let orderTimeStr = "";
+        if (order.createdAt && order.createdAt.seconds) {
+          orderTimeStr = new Date(order.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
+        } else {
+          orderTimeStr = "Just now";
+        }
+
         const itemsList = (order.items || []).map(i => `
           <div class="flex justify-between text-xs py-1 border-b border-slate-700/50">
             <span class="text-slate-200">${i.name} <strong class="text-orange-400">x${i.quantity}</strong></span>
@@ -198,9 +204,15 @@
           <div class="bg-slate-800 rounded-xl p-4 border ${isDone ? 'border-slate-700 opacity-60' : 'border-orange-500/50 shadow-lg'} flex flex-col justify-between">
             <div>
               <div class="flex justify-between items-center mb-3">
-                <span class="px-2.5 py-1 rounded-md text-xs font-bold ${order.orderType === 'dinein' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}">
-                  ${order.tableNo}
-                </span>
+                <div class="flex items-center gap-2">
+                  <span class="px-2.5 py-1 rounded-md text-xs font-bold ${order.orderType === 'dinein' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}">
+                    ${order.tableNo}
+                  </span>
+                  <!-- కిచెన్ స్క్రీన్‌పై ఆర్డర్ వచ్చిన టైమ్ -->
+                  <span class="text-[11px] font-bold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700 flex items-center gap-1">
+                    <i class="fa-regular fa-clock text-[10px] text-orange-400"></i> ${orderTimeStr}
+                  </span>
+                </div>
                 <span class="text-xs font-semibold px-2 py-0.5 rounded ${isDone ? 'bg-slate-700 text-slate-300' : 'bg-amber-500/20 text-amber-300'}">
                   ${order.status || 'New'}
                 </span>
