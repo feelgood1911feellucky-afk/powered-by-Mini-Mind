@@ -9,9 +9,9 @@
 </head>
 <body class="bg-slate-900 text-gray-100 min-h-screen p-4 select-none">
 
-  <!-- Background Audio Element -->
+  <!-- Loud Clear Restaurant Bell Audio (Base64 High Volume) -->
   <audio id="orderAlarmAudio" preload="auto">
-    <source src="data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YVoGAACBhYqFbF1fdJivrJBhNjVgodDbqWE4MTei3/LLcT4xP6LT8M50PjE/odPwy3c+MT+i0/DNdT4xP6LT8M50PjE/otPwzXQ+MT+i0/DNdD4xP6LT8M50PjE/otPwzXQ+MT+i0/DNdD4xP6LT8M50PjE/otPwznQ+MT+i0/DNdD4x" type="audio/wav">
+    <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
   </audio>
 
   <!-- FIRST TOUCH AUDIO UNLOCK OVERLAY -->
@@ -21,7 +21,7 @@
     </div>
     <h2 class="text-2xl font-black text-white mb-2">Kitchen Live Audio</h2>
     <p class="text-sm text-slate-300 max-w-xs mb-6">
-      ఆర్డర్ సౌండ్ ఆన్ చేయడానికి స్క్రీన్‌పై ఎక్కడైనా ఒకసారి టచ్ చేయండి.
+      ఆర్డర్ సౌండ్ మరియు స్క్రీన్ ఆల్వేస్-ఆన్ మోడ్ ప్రారంభించడానికి ఇక్కడ టచ్ చేయండి.
     </p>
     <button onclick="enableSoundDirectly()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-black text-base px-8 py-3.5 rounded-2xl shadow-lg shadow-emerald-600/40 active:scale-95 transition flex items-center gap-2">
       <i class="fa-solid fa-volume-high"></i>
@@ -81,13 +81,23 @@
 
     let audioCtx = null;
     let soundEnabled = true;
-    const bgAudio = document.getElementById("orderAlarmAudio");
+    let wakeLock = null;
+    const alarmAudio = document.getElementById("orderAlarmAudio");
 
-    function requestNotificationPermission() {
-      if ("Notification" in window && Notification.permission !== "granted") {
-        Notification.requestPermission();
-      }
+    // Keep screen awake (ఫోన్ స్క్రీన్ స్లీప్ అవ్వకుండా ఆన్‌లో ఉంచుతుంది)
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {}
     }
+
+    document.addEventListener('visibilitychange', async () => {
+      if (wakeLock !== null && document.visibilityState === 'visible') {
+        await requestWakeLock();
+      }
+    });
 
     function initAudio() {
       if (!audioCtx) {
@@ -96,13 +106,14 @@
       if (audioCtx.state === 'suspended') {
         audioCtx.resume();
       }
-      if (bgAudio) {
-        bgAudio.play().then(() => {
-          bgAudio.pause();
-          bgAudio.currentTime = 0;
+      if (alarmAudio) {
+        alarmAudio.volume = 1.0;
+        alarmAudio.play().then(() => {
+          alarmAudio.pause();
+          alarmAudio.currentTime = 0;
         }).catch(() => {});
       }
-      requestNotificationPermission();
+      requestWakeLock();
     }
 
     window.enableSoundDirectly = function() {
@@ -119,7 +130,7 @@
       text.innerText = "Sound On";
       btn.classList.add("border-emerald-500");
 
-      playBellSound();
+      playLoudAlert();
     };
 
     document.addEventListener("click", () => {
@@ -141,7 +152,7 @@
         icon.className = "fa-solid fa-volume-high text-emerald-400";
         text.innerText = "Sound On";
         btn.classList.add("border-emerald-500");
-        playBellSound();
+        playLoudAlert();
       } else {
         icon.className = "fa-solid fa-volume-xmark text-red-400";
         text.innerText = "Sound Off";
@@ -149,16 +160,17 @@
       }
     };
 
-    function playBellSound(orderInfo = "కొత్త ఆర్డర్ వచ్చింది!") {
+    function playLoudAlert() {
       if (!soundEnabled) return;
 
-      // 1. Background HTML Audio
-      if (bgAudio) {
-        bgAudio.currentTime = 0;
-        bgAudio.play().catch(() => {});
+      // 1. Play Loud Bell Audio
+      if (alarmAudio) {
+        alarmAudio.currentTime = 0;
+        alarmAudio.volume = 1.0;
+        alarmAudio.play().catch(() => {});
       }
 
-      // 2. Synthesizer Chime
+      // 2. High-Pitch Synthesizer Backup
       initAudio();
       if (audioCtx) {
         try {
@@ -166,53 +178,42 @@
           
           const osc1 = audioCtx.createOscillator();
           const gain1 = audioCtx.createGain();
-          osc1.type = 'sine';
-          osc1.frequency.setValueAtTime(880, now);
-          gain1.gain.setValueAtTime(0.4, now);
-          gain1.gain.exponentialRampToValueAtTime(0.001, now + 0.8);
+          osc1.type = 'triangle';
+          osc1.frequency.setValueAtTime(1046.5, now); // High C6
+          gain1.gain.setValueAtTime(0.8, now);
+          gain1.gain.exponentialRampToValueAtTime(0.001, now + 1.0);
           osc1.connect(gain1);
           gain1.connect(audioCtx.destination);
           osc1.start(now);
-          osc1.stop(now + 0.8);
+          osc1.stop(now + 1.0);
 
           const osc2 = audioCtx.createOscillator();
           const gain2 = audioCtx.createGain();
-          osc2.type = 'sine';
-          osc2.frequency.setValueAtTime(1760, now + 0.15);
-          gain2.gain.setValueAtTime(0.4, now + 0.15);
-          gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.2);
+          osc2.type = 'triangle';
+          osc2.frequency.setValueAtTime(1318.5, now + 0.15); // E6
+          gain2.gain.setValueAtTime(0.8, now + 0.15);
+          gain2.gain.exponentialRampToValueAtTime(0.001, now + 1.4);
           osc2.connect(gain2);
           gain2.connect(audioCtx.destination);
           osc2.start(now + 0.15);
-          osc2.stop(now + 1.2);
+          osc2.stop(now + 1.4);
         } catch (e) {}
       }
 
-      // 3. Vibration Alert
+      // 3. Strong Vibration
       if ("vibrate" in navigator) {
-        navigator.vibrate([300, 150, 300]);
-      }
-
-      // 4. Background Notification Popup
-      if ("Notification" in window && Notification.permission === "granted" && document.hidden) {
-        new Notification("New Kitchen Order!", {
-          body: orderInfo,
-          icon: "https://cdn-icons-png.flaticon.com/512/1046/1046784.png"
-        });
+        navigator.vibrate([400, 200, 400]);
       }
     }
 
     let isInitialLoad = true;
-
     const q = query(collection(db, "orders"), orderBy("createdAt", "desc"));
 
     onSnapshot(q, (snapshot) => {
       if (!isInitialLoad) {
         snapshot.docChanges().forEach((change) => {
           if (change.type === "added") {
-            const data = change.doc.data();
-            const tbl = data.tableNo || "Table";
-            playBellSound(`${tbl} నుండి ఆర్డర్ వచ్చింది!`);
+            playLoudAlert();
           }
         });
       }
@@ -229,7 +230,6 @@
         const id = orderDoc.id;
         const isDone = order.status === "Completed";
 
-        // ఆర్డర్ సమయాన్ని ఫార్మాట్ చేయడం (Time Display)
         let orderTimeStr = "";
         if (order.createdAt && order.createdAt.seconds) {
           orderTimeStr = new Date(order.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: true });
@@ -252,7 +252,6 @@
                   <span class="px-2.5 py-1 rounded-md text-xs font-bold ${order.orderType === 'dinein' ? 'bg-orange-500/20 text-orange-400' : 'bg-emerald-500/20 text-emerald-400'}">
                     ${order.tableNo}
                   </span>
-                  <!-- కిచెన్ స్క్రీన్‌పై ఆర్డర్ వచ్చిన టైమ్ -->
                   <span class="text-[11px] font-bold text-slate-300 bg-slate-900 px-2 py-0.5 rounded border border-slate-700 flex items-center gap-1">
                     <i class="fa-regular fa-clock text-[10px] text-orange-400"></i> ${orderTimeStr}
                   </span>
